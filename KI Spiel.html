@@ -1,0 +1,244 @@
+Gerne! Hier findest du einen einfachen, funktionsfähigen HTML-/JavaScript-Entwurf für das Spiel „Wie denkt KI?“. Das Beispiel ist bewusst übersichtlich gehalten und kann auf SharePoint oder jedem Webserver genutzt werden. Es ist keine externe Bibliothek notwendig.
+
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Wie „denkt“ KI? – Interaktives Spiel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            background: #eaf6fb;
+            font-family: 'Open Sans', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 30px auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+            padding: 24px 32px 32px 32px;
+        }
+        h1 {
+            color: #0077b6;
+            margin-bottom: 0;
+        }
+        .subtitle {
+            color: #555;
+            margin-bottom: 24px;
+        }
+        .box {
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 18px;
+        }
+        .frage-box {
+            border: 2px solid #e63946;
+            background: #fff0f0;
+        }
+        .antwort-box {
+            border: 2px solid #43aa8b;
+            background: #f0fff6;
+            min-height: 40px;
+            font-size: 1.2em;
+            margin-bottom: 12px;
+        }
+        .vorschlaege-box {
+            border: 2px solid #222;
+            background: #f7f7fa;
+        }
+        .vorschlaege-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .vorschlag-btn {
+            background: #fff;
+            border: 1px solid #0077b6;
+            border-radius: 20px;
+            padding: 6px 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 1em;
+        }
+        .vorschlag-btn.selected {
+            background: #0077b6;
+            color: #fff;
+        }
+        .progress {
+            margin: 18px 0 10px 0;
+            font-size: 1.1em;
+        }
+        .reflexion {
+            background: #f1f8e9;
+            border-left: 4px solid #43aa8b;
+            padding: 12px;
+            margin-bottom: 16px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 32px;
+            color: #888;
+            font-size: 0.95em;
+        }
+        .roboter {
+            font-size: 2em;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @media (max-width: 700px) {
+            .container {
+                padding: 12px 4vw 24px 4vw;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Wie „denkt“ KI?</h1>
+        <div class="subtitle">Ein interaktives Spiel zur KI-Textgenerierung</div>
+        
+        <div class="box frage-box">
+            <label for="frage">Frage eingeben:</label><br>
+            <input type="text" id="frage" style="width:80%;" placeholder="z.B. Warum schwimmt Holz?">
+            <button onclick="setFrage()">Übernehmen</button>
+            <div id="frageAnzeige" style="margin-top:10px; font-weight:bold;"></div>
+        </div>
+        
+        <div class="box antwort-box" id="antwortBox">
+            <span id="antwort">Antwort erscheint hier...</span>
+        </div>
+        
+        <div class="box vorschlaege-box">
+            <div>
+                <label for="vorschlag">Neues Wort vorschlagen:</label>
+                <input type="text" id="vorschlag" maxlength="20">
+                <button onclick="addVorschlag()">Hinzufügen</button>
+            </div>
+            <div class="vorschlaege-list" id="vorschlaegeList"></div>
+            <button onclick="waehleWort()" style="margin-top:10px;">Wort mit den meisten Stimmen übernehmen</button>
+        </div>
+        
+        <div class="progress" id="progress">Wort 0 von 5</div>
+        
+        <div class="reflexion" id="reflexion" style="display:none;">
+            <strong>Reflexion:</strong> Warum habt ihr dieses Wort gewählt?<br>
+            <textarea rows="2" style="width:100%;margin-top:6px;" placeholder="Notizen..."></textarea>
+        </div>
+        
+        <button onclick="resetSpiel()" style="margin-top:10px;">Neues Spiel starten</button>
+        
+        <div class="footer">
+            <span class="roboter">🤖</span>
+            „Ich wähle das wahrscheinlichste Wort – wie eine KI!“
+        </div>
+    </div>
+    <script>
+        let frage = "";
+        let antwort = [];
+        let vorschlaege = [];
+        let stimmen = [];
+        let maxWoerter = 5;
+        let wortNr = 0;
+
+        function setFrage() {
+            frage = document.getElementById('frage').value.trim();
+            document.getElementById('frageAnzeige').innerText = frage ? "Frage: " + frage : "";
+            resetAntwort();
+        }
+
+        function resetAntwort() {
+            antwort = [];
+            wortNr = 0;
+            vorschlaege = [];
+            stimmen = [];
+            document.getElementById('antwort').innerText = "Antwort erscheint hier...";
+            document.getElementById('vorschlaegeList').innerHTML = "";
+            document.getElementById('progress').innerText = "Wort 0 von " + maxWoerter;
+            document.getElementById('reflexion').style.display = "none";
+        }
+
+        function addVorschlag() {
+            let wort = document.getElementById('vorschlag').value.trim();
+            if (wort && !vorschlaege.includes(wort)) {
+                vorschlaege.push(wort);
+                stimmen.push(0);
+                renderVorschlaege();
+            }
+            document.getElementById('vorschlag').value = "";
+        }
+
+        function renderVorschlaege() {
+            let list = document.getElementById('vorschlaegeList');
+            list.innerHTML = "";
+            vorschlaege.forEach((wort, idx) => {
+                let btn = document.createElement('button');
+                btn.className = "vorschlag-btn";
+                btn.innerText = wort + " (" + stimmen[idx] + ")";
+                btn.onclick = function() {
+                    stimmen[idx]++;
+                    btn.classList.add("selected");
+                    btn.innerText = wort + " (" + stimmen[idx] + ")";
+                };
+                list.appendChild(btn);
+            });
+        }
+
+        function waehleWort() {
+            if (vorschlaege.length === 0) return;
+            let max = Math.max(...stimmen);
+            let idx = stimmen.indexOf(max);
+            let wort = vorschlaege[idx];
+            antwort.push(wort);
+            wortNr++;
+            document.getElementById('antwort').innerText = antwort.join(" ");
+            vorschlaege = [];
+            stimmen = [];
+            renderVorschlaege();
+            document.getElementById('progress').innerText = "Wort " + wortNr + " von " + maxWoerter;
+            if (wortNr === 2 || wortNr === 3) {
+                document.getElementById('reflexion').style.display = "block";
+            } else {
+                document.getElementById('reflexion').style.display = "none";
+            }
+            if (wortNr >= maxWoerter) {
+                document.getElementById('vorschlaegeList').innerHTML = "";
+            }
+        }
+
+        function resetSpiel() {
+            document.getElementById('frage').value = "";
+            document.getElementById('frageAnzeige').innerText = "";
+            resetAntwort();
+        }
+    </script>
+</body>
+</html>
+
+Kopieren
+
+
+
+
+Hinweise zur Nutzung und Anpassung:
+
+
+- Die Teilnehmer:innen geben Vorschläge für das nächste Wort ein und stimmen ab, indem sie auf den jeweiligen Vorschlag klicken (jeder Klick zählt eine Stimme).
+
+- Mit dem Button „Wort mit den meisten Stimmen übernehmen“ wird das meistgewählte Wort zur Antwort hinzugefügt.
+
+- Nach 2 oder 3 Wörtern erscheint der Reflexionsbereich.
+
+- Mit „Neues Spiel starten“ wird alles zurückgesetzt.
+
+- Das Layout ist responsiv und funktioniert auch auf Tablets und Smartphones.
+
+- Für Workshops kann die Seite auf SharePoint oder jedem Webserver bereitgestellt werden.
+
+
+
+Erweiterungen und Anpassungen sind jederzeit möglich!
